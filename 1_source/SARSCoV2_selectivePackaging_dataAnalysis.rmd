@@ -1,0 +1,57 @@
+---
+title: "2021_08_24_SARSCoV2_selectivePackaging_dataAnalysis"
+author: "Noah Peña"
+date: "8/24/2021"
+output: html_document
+---
+#Setup 
+```{r, set up packages etc., echo=FALSE, results="hide", warning=FALSE, message=FALSE}
+
+#Improt packages for plotting and data manipulation.ff
+library(ggplot2)
+library(scales)
+library(reshape2)
+library(tidyr)
+library(dplyr) #its important that this is after tidyr I think
+# library(dplyr)
+# library(magrittr)
+# library(knitr)
+library(grid)
+library(gridExtra)
+#library(ggpubr)
+library(tidyverse)
+
+#Reading in svg files into r for ggplotting
+#library(grImport2)
+#library(grConvert)
+#Reading and plotting jpeg and PNG
+#library(jpeg)
+#library(png)
+
+#library(ggrepel)
+#library(stringr)
+#library(forcats)
+#library(readxl)
+
+#For nice log labels
+#library(cat.extras)
+#library(plotly)
+
+#library(extrafont)
+#font_import()
+#loadfonts()
+
+#Set the global figure theme now
+theme_set(
+  theme_bw() + theme(legend.position = "bottom", 
+        text = element_text(family = "Arial", size = 14),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(color = "black"))
+  )
+
+#Define a function that excludes things
+`%nin%` = Negate(`%in%`)
+
+empty_graph <- ggplot() + theme_void()
+```
