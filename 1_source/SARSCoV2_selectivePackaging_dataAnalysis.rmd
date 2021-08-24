@@ -55,3 +55,625 @@ theme_set(
 
 empty_graph <- ggplot() + theme_void()
 ```
+
+##setwd
+```{r}
+setwd("./1_source")
+```
+
+#________________
+#Csabaeus tRNA library 
+##Experimental: Read in Counts
+```{r}
+FILES <-data.frame( file_name = list.files("../6_sam_counter/Csabeaus_tRNA/SARS_experimental/") )
+#Files are experimental if they have TP-CK-pl2-CW-6 and TP-CK-pl2-CW-7 in filename
+
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","junk2","barcode", "junk3") ) %>% 
+  mutate(sample = barcode) %>% 
+  select(-barcode) %>% 
+  select(-junk1, -junk2, -junk3) 
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-pl2-CW-6"="minus",
+                        "TP-CK-pl2-CW-7"="plus") 
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="virion_1",
+                       "bc2"="virion_2",
+                       "bc3"="virion_3",
+                       "bc4"="virion_4",
+                       "bc5"="virion_5",
+                       "bc6"="virion_6") #I got this info from the google doc
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/Csabeaus_tRNA/SARS_experimental/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.character(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+tRNA_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+tRNA_count <- tRNA_count %>% 
+  filter(sample %in% c("virion_1","virion_2","virion_3",
+                       "virion_4","virion_5","virion_6"))
+
+tRNA_count <- tRNA_count %>% 
+  mutate(group = DM)
+
+tRNA_count$group <- recode(tRNA_count$group,
+                                             "minus" = "experimental",
+                                             "plus" = "experimental")
+
+
+
+```
+##Control: Read in Counts
+```{r}
+FILES <-data.frame( file_name = list.files("../6_sam_counter/Csabeaus_tRNA/SARS_control/") )
+#Files are SARS_control if they have: TP-CK-16S-CW01,TP-CK-16S-CW02 in filename
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","barcode", "junk3") ) %>%
+  mutate(sample = barcode) %>%
+  select(-barcode) %>%
+  select(-junk1, -junk3)
+
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-16S-CW01"="minus",
+                        "TP-CK-16S-CW02"="plus") 
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="rep_1",
+                       "bc2"="rep_2",
+                       "bc3"="rep_3") 
+
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/Csabeaus_tRNA/SARS_control/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.character(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+tRNA_ctrl_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+tRNA_ctrl_count <- tRNA_ctrl_count %>% 
+  mutate(group = DM)
+
+tRNA_ctrl_count$group <- recode(tRNA_ctrl_count$group,
+                                             "minus" = "control",
+                                             "plus" = "control")
+
+  
+
+
+```
+
+##Merge control and experimental datasets
+```{r}
+tRNA_count_merge <- rbind(tRNA_count,tRNA_ctrl_count)
+
+```
+
+
+#_
+#Name Processing
+###mtRNA and tRNA counts
+```{r}
+
+tRNA_count_merge <- tRNA_count_merge %>%
+  select(-file_name)
+
+
+#filter mitochondrial tRNA
+temp <- tRNA_count_merge %>%
+  filter(grepl("MT",name)) 
+temp$source <- "mitochondrial"
+#Add AA, anticodon to mtRNA dataframe
+# temp <- temp %>% 
+#   mutate(info = gene)
+
+#Simplify names - get rid of the long genus information and only get the AA and anticodon information 
+temp$info <- str_replace_all(temp$name, "Chlorocebus_sabaeus_chrMT.tRNA1-","")
+#Add an underscore between the Anticodon and AA information 
+temp$info <- sub("^(.{3})", "\\1_", temp$info)
+
+#Gather the AA and anticodon information from modified info column
+temp <- temp%>%
+  separate(info, sep="_", c("AA","anticodon"))
+
+#Split by cytosolic tRNA to fix names 
+temp2<- tRNA_count_merge %>% 
+  filter(!grepl("MT",name))
+temp2$source <- "cytosolic"
+
+temp2$info <- str_replace_all(temp2$name, "60711-","")
+
+temp2 <- temp2%>%
+  separate(info, sep="_", c("rfam_id","info2","genus","species",
+                            "RNA_type"))
+
+#Special conditions for initiator Met
+temp3 <- temp2 %>%
+  filter(grepl("Meti",name))
+
+temp2$info2 <- sub("^(.{3})", "\\1_", temp2$info2)
+temp3$info2 <- sub("^(.{4})", "\\1_", temp3$info2)
+
+
+temp2 <- temp2 %>%
+  separate(info2, sep="_", c("AA","anticodon"))
+temp3 <- temp3 %>%
+  separate(info2, sep="_", c("AA","anticodon"))
+
+temp4 <- rbind(temp2,temp3)
+
+# #Special conditions for initiator Met
+# temp3 <- temp2 %>%
+#   filter(grepl("Meti",name))
+# 
+# temp2$info2 <- sub("^(.{3})", "\\1_", temp2$info2)
+# temp3$info2 <- sub("^(.{4})", "\\1_", temp3$info2)
+# 
+# temp2 <- temp2 %>%
+#   rbind(.,temp3)
+
+# #Add AA and anticodon to name so easier to look at 
+# temp2 <- temp2 %>%
+#   separate(info2, sep="_", c("AA","anticodon"))
+# temp2$name <- paste(temp2$rfam_id,temp2$AA, sep = "-")
+# temp2$name <- paste(temp2$name,temp2$anticodon, sep = "")
+
+
+
+#Organised the colums for temp and temp2 dataframes so they can be merged together via rbind
+temp4 <- temp4 %>% 
+  ungroup() %>%
+  select(name, count, sample, 
+         DM, group,source,
+         AA,anticodon)
+
+temp <- temp %>% 
+  ungroup() %>%
+  select(name, count, sample, 
+         DM, group,source,
+         AA,anticodon)
+
+processed_tRNA_count <- rbind(temp,temp4)
+
+```
+
+#_________________
+#ncRNA library-- library:Chlorocebus_sabaeus_NOT_tRNA_rfam_dataset
+#_
+##Experimental: Read in Counts
+```{r}
+#Path to sam counter files 
+FILES <-data.frame( file_name = list.files("../6_sam_counter/Chlorocebus_sabaeus_NOT_tRNA_rfam_dataset2/SARS_experimental/") )
+
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","junk2","barcode", "junk3") ) %>% 
+  mutate(sample = barcode) %>% 
+  select(-barcode) %>% 
+  select(-junk1, -junk2, -junk3) 
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-pl2-CW-6"="minus",
+                        "TP-CK-pl2-CW-7"="plus") #Recode lets you easily change a bunch of values all at once
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="virion_1",
+                       "bc2"="virion_2",
+                       "bc3"="virion_3",
+                       "bc4"="virion_4",
+                       "bc5"="virion_5",
+                       "bc6"="virion_6") #I got this info from the google doc
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/Chlorocebus_sabaeus_NOT_tRNA_rfam_dataset2/SARS_experimental/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.numeric(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+ncRNA_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+ncRNA_count <- ncRNA_count %>% 
+  filter(sample %in% c("virion_1","virion_2","virion_3",
+                       "virion_4","virion_5","virion_6"))
+
+ncRNA_count <- ncRNA_count %>% 
+  mutate(group = DM)
+
+ncRNA_count$group <- recode(ncRNA_count$group,
+                                             "minus" = "experimental",
+                                             "plus" = "experimental")
+
+
+```
+##Control: Read in Counts
+```{r}
+#Path to sam counter files 
+FILES <-data.frame( file_name = list.files("../6_sam_counter/Chlorocebus_sabaeus_NOT_tRNA_rfam_dataset2/SARS_control/") )
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","barcode","junk2") ) %>%
+  mutate(sample = barcode) %>%
+  select(-barcode) %>%
+  select(-junk1, -junk2)
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-16S-CW01"="minus",
+                        "TP-CK-16S-CW02"="plus") 
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="rep_1",
+                       "bc2"="rep_2",
+                       "bc3"="rep_3") #I got this info from the google doc
+
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/Chlorocebus_sabaeus_NOT_tRNA_rfam_dataset2/SARS_control/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.numeric(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+ncRNA_ctrl_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+ncRNA_ctrl_count <- ncRNA_ctrl_count %>% 
+  mutate(group = DM)
+
+ncRNA_ctrl_count$group <- recode(ncRNA_ctrl_count$group,
+                                             "minus" = "control",
+                                             "plus" = "control")
+  
+
+
+```
+
+##Merge control and experimental datasets
+```{r}
+ncRNA_count_merge <- rbind(ncRNA_count,ncRNA_ctrl_count)
+
+```
+
+
+#_
+#Name Processing
+##ncRNA counts
+```{r}
+reference <- read.csv(paste0("../2_ref_seq/Chlorocebus_sabaeus_not_tRNA_rfam_data_headers.csv"), header = T,sep =",") 
+
+
+#specify data types since enpty dataframes get confused and sad
+reference$name <- as.character(reference$name) 
+reference$species <- as.character(reference$species) 
+reference$RNA_type <- as.character(reference$RNA_type) 
+
+
+
+rfam_asdf <- reference
+
+
+#Merge data_COVID19_rfam_counts with rfam_asdf 
+
+processed_ncRNA_count<- full_join(rfam_asdf,ncRNA_count_merge, by = c("name")) 
+
+
+#Some ID have NA values, likely due to reduancy within the database and/or just them not being present in the isolates 
+#The following is code to remove NA values from our data frame 
+processed_ncRNA_count <- processed_ncRNA_count %>%
+  drop_na("count","sample","DM")
+
+```
+
+#__________________
+#sars_cov_2-- library:sars_cov_2.fa 
+##Experimental: Read in Counts
+```{r}
+#Path to sam counter files 
+FILES <-data.frame( file_name = list.files("../6_sam_counter/sars_cov_2/") )
+
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","junk2","barcode", "junk3") ) %>% 
+  mutate(sample = barcode) %>% 
+  select(-barcode) %>% 
+  select(-junk1, -junk2, -junk3) 
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+FILES <- FILES %>%
+  filter(library %in% c("TP-CK-pl2-CW-6", "TP-CK-pl2-CW-7"))
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-pl2-CW-6"="minus",
+                        "TP-CK-pl2-CW-7"="plus") 
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="virion_1",
+                       "bc2"="virion_2",
+                       "bc3"="virion_3",
+                       "bc4"="virion_4",
+                       "bc5"="virion_5",
+                       "bc6"="virion_6") #I got this info from the google doc
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/sars_cov_2/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.numeric(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+sars_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+sars_count <- sars_count %>% 
+  filter(sample %in% c("virion_1","virion_2","virion_3",
+                       "virion_4","virion_5","virion_6"))
+
+sars_count <- sars_count %>% 
+  mutate(group = DM)
+
+sars_count$group <- recode(sars_count$group,
+                                             "minus" = "experimental",
+                                             "plus" = "experimental")
+
+sars_count <- as.data.frame(sars_count)
+
+
+```
+##Control: Read in Counts
+```{r}
+
+#Path to sam counter files 
+FILES <-data.frame( file_name = list.files("../6_sam_counter/sars_cov_2/") )
+
+#Split generic file names into salient parts
+FILES <- FILES %>%
+  extract(file_name, "(.*).tsv", into="file_name2", remove=FALSE) %>%
+  filter(!grepl("kallisto",file_name)) %>%
+  filter(!grepl("unassigned",file_name)) %>%
+  separate(file_name2, remove=TRUE, sep="_", c("library","junk1","barcode","junk2") ) %>%
+  mutate(sample = barcode) %>%
+  select(-barcode) %>%
+  select(-junk1, -junk2)
+
+FILES <- FILES %>%
+  filter(library %in% c("TP-CK-16S-CW01", "TP-CK-16S-CW02"))
+
+#PROJECT SPECIFIC DECODING
+FILES$file_name <- as.character(FILES$file_name)
+FILES$sample <- as.character(FILES$sample)
+
+
+
+#Label which samples are DM treated or not DM treated 
+FILES$library <- recode(FILES$library, 
+                        "TP-CK-16S-CW01"="minus",
+                        "TP-CK-16S-CW02"="plus") 
+
+FILES$sample <- recode(FILES$sample, 
+                       "bc1"="rep_1",
+                       "bc2"="rep_2",
+                       "bc3"="rep_3") #I got this info from the google doc
+
+
+
+#Change the "library" column to DM
+FILES <- FILES %>%
+  mutate(DM = library) %>%
+  select(-library)
+
+
+#A function that reads in a data file and adds above annotation
+read_in_one <- function(row){
+  output <- read.csv(paste0("../6_sam_counter/sars_cov_2/", row$file_name), header=T, sep="\t") %>%
+  mutate(sample = row$sample,
+           DM = row$DM)
+  #specify data types since enpty dataframes get confused and sad
+  output$name <- as.character(output$name)
+  output$count <- as.numeric(output$count)
+  output$DM <- as.character(output$DM)
+  return(output)
+}
+
+
+
+#Up to this point the "FILES" data frame is just identifying info, no actual tRNA data.
+#The last step here is to run the funciton above such that it reads in the data in file with 
+#"file_name" and identifies all of that data with the right patient, tissue, DM, bin_start, etc data
+
+#A loop to read in all the data files and add the annotation
+sars_ctrl_count <- FILES %>%
+  group_by(file_name) %>%
+  do(read_in_one(.)) %>%
+  ungroup()  %>%
+  select(-file_name)
+
+sars_ctrl_count <- sars_ctrl_count %>% 
+  mutate(group = DM)
+
+sars_ctrl_count$group <- recode(sars_ctrl_count$group,
+                                             "minus" = "control",
+                                             "plus" = "control")
+
+sars_ctrl_count <- sars_ctrl_count %>% 
+  filter(sample %in% c("rep_1","rep_2","rep_3"))
+  
+
+```
+
+##Merge control and experimental datasets
+```{r}
+sars_count_merge <- rbind(sars_count,sars_ctrl_count)
+
+```
