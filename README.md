@@ -1,7 +1,9 @@
 # tRNA_seq_SARSCoV2_selectivePackaging
 
 This is the GitHub reposotiroy for paper "Profiling selective packaging of host RNA and viral RNA modification in the SARS-CoV-2 virion" by 
-Noah Pena, Wen Zhang, Christopher Watkins, Hala Alshammary, Viviana Simon4, Christopher Katanski , and Tao Pan. 
+Noah Pena, Wen Zhang, Christopher Watkins, Hala Alshammary, Viviana Simon, Christopher Katanski , and Tao Pan. 
+
+1. Department of Molecular Genetics and Cell Biology, 2. Department of Biochemistry and Molecular Biology, 3. Committee on Microbiology, University of Chicago, Chicago, IL 60637, USA. 4. Department of Microbiology, Icahn School of Medicine at Mount Sinai, New York, New York 10029, USA.
 
 Abstract: 
 Viruses package host RNAs in their virions which are associated with a range of functions in the viral life cycle. Previous transcriptomic profiling on host RNA packaging were mostly focused on retroviruses. Which host RNAs are packaged in other viruses at the transcriptome level has not been thoroughly examined. Here we apply both small RNA and large RNA sequencing of SARS-CoV-2 virions from six individual isolates in Vero cell cultures to profile packaging of host RNAs in a coronavirus and to explore SARS-CoV-2 genomic RNA modifications. We find selective packaging of specific tRNAs, tRNA fragments and signal recognition particle RNA into SARS-CoV-2 virions. Virions from all individual clones package the same set of host RNAs, suggesting a common mechanism of selective packaging. We estimate that a SARS-CoV-2 virion contains up to 1 SRP RNA and 4 tRNA molecules. We identify tRNA modification differences between the virion-packaged tRNAs and those in the uninfected host cells. Furthermore, we find subgenomic viral RNAs in the virions, and uncharacterized candidate modifications in the SARS-CoV-2 genomic RNA. Our results reveal an under-explored aspect of viral-host interaction that may be explored for viral therapeutics.
